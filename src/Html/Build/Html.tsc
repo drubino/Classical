@@ -1,0 +1,5 @@
+﻿--out C:\Classical\bin\classical.html.js
+--target ES5
+--removeComments
+c:\classical\bin\classical.d.ts
+..\Html.ts 

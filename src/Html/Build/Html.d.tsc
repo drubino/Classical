@@ -1,0 +1,5 @@
+﻿--out C:\Classical\bin\classical.html.d.ts
+--target ES5
+--declaration
+c:\classical\bin\classical.d.ts
+..\Html.ts

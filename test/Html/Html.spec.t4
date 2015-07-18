@@ -1,0 +1,70 @@
+﻿<#@ template  debug="true" hostSpecific="true" #>
+<#@ output extension=".tt" #>
+<#@ Assembly Name="System.Core" #>
+<#@ Assembly Name="System.Windows.Forms" #>
+<#@ import namespace="System" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Diagnostics" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Collections" #>
+<#@ import namespace="System.Collections.Generic" #> 
+<#
+	var t4FilePath = Host.ResolvePath("HtmlTemplate.spec.t4");
+	var t4FileLines = File.ReadAllLines(t4FilePath).ToList();
+	var typeScriptFilePath = Host.ResolvePath("HtmlTemplate.spec.ts");
+	var typeScriptFileLines = File.ReadAllLines(typeScriptFilePath).ToList();
+
+	var initializationSelection = GetFileSelection("Initialization", t4FileLines);
+#>
+<#= initializationSelection #>
+<# 
+	foreach(var typeScriptFileLine in typeScriptFileLines)
+    {
+		var trimmedText = typeScriptFileLine.Trim();
+
+		if(trimmedText.StartsWith("//##"))
+        {
+			var keyword = trimmedText.Split(new[] { " " }, StringSplitOptions.RemoveEmptyEntries)[1];
+			var keywordContent = GetFileSelection(keyword, t4FileLines);
+#>
+<#= keywordContent #>
+<#
+        }
+		else
+        {
+#>
+<#= typeScriptFileLine #>
+<#
+        }
+    }
+#>
+<#+ 
+	#region GetFileSelection
+
+	private string GetFileSelection(string sectionName, List<string> fileLines)
+	{
+		var beginString = string.Format("\<# /*{0}:Begin*/ \#>", sectionName);
+        var endString = string.Format("\<# /*{0}:End*/ \#>", sectionName);
+        var beginIndex = fileLines.IndexOf(beginString);
+        var endIndex = fileLines.IndexOf(endString);
+        var content = GetContent(fileLines, beginIndex + 1, endIndex);
+
+        return string.Join(Environment.NewLine, content);
+	}
+
+	#endregion
+
+	#region GetContent
+	
+    private List<string> GetContent(List<string> fileLines, int startIndex, int endIndex)
+    {
+		if(startIndex < 0 || endIndex < 0)
+			return new List<string>();
+
+        var count = endIndex - startIndex;
+	
+        return fileLines.GetRange(startIndex, count);
+    }
+
+	#endregion
+#>

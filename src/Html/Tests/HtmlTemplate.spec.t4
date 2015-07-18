@@ -1,0 +1,229 @@
+﻿<# /*Initialization:Begin*/ #>
+<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="$(ProjectDir)/bin/Html.Generation.dll" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="Html.Generation.Utilities" #>
+<#@ import namespace="Html.Generation.Elements" #>
+<#@ output extension=".ts" #>
+<#
+	var elementTypesToSkip = new [] { "HtmlElement", "HtmlElementContainer" };
+
+	var enumGenerators = TypeScriptGenerator.EnumGenerators.ToList();
+	var interfaceGenerators = TypeScriptGenerator.InterfaceGenerators.ToList();
+	var elementGenerators = TypeScriptGenerator.ElementGenerators.ToList();
+	var automatedElementGenerators = elementGenerators
+		.Where(e => !elementTypesToSkip.Contains(e.Name))
+		.ToList();
+
+	var htmlElementGenerator = elementGenerators.Single(e => e.Name == "HtmlElement");
+	var htmlElementContainerGenerator = elementGenerators.Single(e => e.Name == "HtmlElementContainer");
+
+	var propertyMapGenerators = 
+		(from elementGenerator in elementGenerators
+		 from propertyGenerator in elementGenerator.Properties
+		 group propertyGenerator by propertyGenerator.Name 
+		 into propertyNameGrouping
+		 select new 
+		 { 
+			 Name = propertyNameGrouping.Key,
+			 ElementName = propertyNameGrouping.First().ElementName,
+		 })
+		.Where(g => g.Name != g.ElementName)
+		.ToList();
+
+	Func<string, string> getEventHandlerName = name => 
+    { 
+        return name.Substring(0, name.Length - "Event".Length) + "Handler";
+    };
+
+	var propertyBasicTypes = new[] { "TimeRanges", "string", "number", "boolean" };
+#>
+<# /*Initialization:End*/ #>
+<# /*ArrayInitialization:Begin*/ #>
+	//#region Array Initialzation
+
+	//#region HtmlElement
+
+	var propertiesHtmlElement = new Array<TestProperty>();
+
+	//#region Initialize Properties
+
+<# 
+		foreach(var property in htmlElementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyElementName = property.ElementName;
+			var propertyVariableName = "test" + htmlElementGenerator.Name + propertyName;
+			var testItemsVariableName = propertyVariableName + "TestItems";
+			var propertyType = property.Type;
+            var testCode = property.TestCode;
+			var isInitializable = property.IsInitializable.ToString().ToLower();
+			var isIdl = property.IsIdlAttribute.ToString().ToLower();
+
+			if(propertyBasicTypes.Contains(propertyType))
+            {
+#>
+	//#region <#= propertyName #>
+
+	var <#= testItemsVariableName #> = new Array<any>();
+	
+	//#region Initialize TestItems
+
+<# 
+				foreach(var testItem in property.TestItems)
+                {
+					var stringItem = testItem.ToString();
+					var testValue = (propertyType == "string") ? string.Format("'{0}'", stringItem) : string.Format("{0}", stringItem);
+#>
+	<#= testItemsVariableName #>.add(<#= testValue #>);
+<# 
+                }
+#>
+
+	//#endregion Initialize TestItems
+
+	var <#= propertyVariableName #> = new TestProperty('<#= propertyName #>', '<#= propertyElementName #>', '<#= propertyType #>', <#= testItemsVariableName #>, "<#= testCode #>", <#= isInitializable #>, <#= isIdl #>);
+	propertiesHtmlElement.add(<#= propertyVariableName #>);
+
+	//#endregion <#= propertyName #>
+
+<# 
+            }
+        }
+#>
+	//#endregion Initialize Properties
+
+	testHtmlElement = new TestElement('<#= htmlElementGenerator.Name #>', '<#= htmlElementGenerator.ElementName #>', '<#= htmlElementGenerator.FactoryMethodName #>', propertiesHtmlElement);
+	elements.add(testHtmlElement);
+
+	//#endregion HtmlElement
+	
+	//#region HtmlElementContainer
+
+	var propertiesHtmlElementContainer = new Array<TestProperty>();
+
+	//#region Initialize Properties
+
+<# 
+		foreach(var property in htmlElementContainerGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyElementName = property.ElementName;
+			var propertyVariableName = "test" + htmlElementContainerGenerator.Name + propertyName;
+			var testItemsVariableName = propertyVariableName + "TestItems";
+			var propertyType = property.Type;
+            var testCode = property.TestCode;
+			var isInitializable = property.IsInitializable.ToString().ToLower();
+			var isIdl = property.IsIdlAttribute.ToString().ToLower();
+
+			if(propertyBasicTypes.Contains(propertyType))
+            {
+#>
+	//#region <#= propertyName #>
+
+	var <#= testItemsVariableName #> = new Array<any>(<#= property.TestItems.Count() #>);
+	
+	//#region Initialize TestItems
+
+<# 
+				foreach(var testItem in property.TestItems)
+                {
+					var stringItem = testItem.ToString();
+					var testValue = (propertyType == "string") ? string.Format("'{0}'", stringItem) : string.Format("{0}", stringItem);
+#>
+	<#= testItemsVariableName #>.add(<#= testValue #>);
+<# 
+                }
+#>
+
+	//#endregion Initialize TestItems
+
+	var <#= propertyVariableName #> = new TestProperty('<#= propertyName #>', '<#= propertyElementName #>', '<#= propertyType #>', <#= testItemsVariableName #>, "<#= testCode #>", <#= isInitializable #>, <#= isIdl #>);
+	propertiesHtmlElementContainer.add(<#= propertyVariableName #>);
+
+	//#endregion <#= propertyName #>
+
+<# 
+            }
+        }
+#>
+	//#endregion Initialize Properties
+
+	testHtmlElementContainer = new TestElement('<#= htmlElementContainerGenerator.Name #>', '<#= htmlElementContainerGenerator.ElementName #>', '<#= htmlElementContainerGenerator.FactoryMethodName #>', propertiesHtmlElementContainer);
+	elements.add(testHtmlElementContainer);
+
+	//#endregion HtmlElementContainer
+
+<#
+	foreach(var elementGenerator in automatedElementGenerators)
+    {
+		var elementName = elementGenerator.Name;
+		var name = elementGenerator.ElementName;
+		var elementVariableName = "test" + elementName;
+		var propertiesVariableName = "properties" + elementName;
+		var factoryMethod = elementGenerator.FactoryMethodName;
+#>
+	//#region <#= elementName #>
+
+	var <#= propertiesVariableName #> = new Array<TestProperty>();
+
+	//#region Initialize Properties
+
+<# 
+		foreach(var property in elementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyElementName = property.ElementName;
+			var propertyVariableName = "test" + elementName + propertyName;
+			var testItemsVariableName = propertyVariableName + "TestItems";
+			var propertyType = property.Type;
+            var testCode = property.TestCode;
+			var isInitializable = property.IsInitializable.ToString().ToLower();
+			var isIdl = property.IsIdlAttribute.ToString().ToLower();
+
+			if(propertyBasicTypes.Contains(propertyType))
+            {
+#>
+	//#region <#= propertyName #>
+
+	var <#= testItemsVariableName #> = new Array<any>();
+	
+	//#region Initialize TestItems
+
+<# 
+				foreach(var testItem in property.TestItems)
+                {
+					var stringItem = testItem.ToString();
+					var testValue = (propertyType == "string") ? string.Format("'{0}'", stringItem) : string.Format("{0}", stringItem);
+#>
+	<#= testItemsVariableName #>.add(<#= testValue #>);
+<# 
+                }
+#>
+
+	//#endregion Initialize TestItems
+
+	var <#= propertyVariableName #> = new TestProperty('<#= propertyName #>', '<#= propertyElementName #>', '<#= propertyType #>', <#= testItemsVariableName #>, "<#= testCode #>", <#= isInitializable #>, <#= isIdl #>);
+	<#= propertiesVariableName #>.add(<#= propertyVariableName #>);
+
+	//#endregion <#= propertyName #>
+
+<# 
+            }
+        }
+#>
+	//#endregion Initialize Properties
+
+	var <#= elementVariableName #> = new TestElement('<#= elementName #>', '<#= name #>', '<#= factoryMethod #>', <#= propertiesVariableName #>);
+	elements.add(<#= elementVariableName #>);
+
+	//#endregion <#= elementName #>
+
+<# 
+    }
+#>
+	//#endregion Array Initialzation
+<# /*ArrayInitialization:End*/ #>

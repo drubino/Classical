@@ -1,0 +1,828 @@
+﻿<# /*Initialization:Begin*/ #>
+<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="$(ProjectDir)/bin/Html.Generation.dll" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="Html.Generation.Utilities" #>
+<#@ import namespace="Html.Generation.Elements" #>
+<#@ output extension=".ts" #>
+<#
+	var elementTypesToSkip = new [] { "HtmlElement", "HtmlElementContainer" };
+
+	var enumGenerators = TypeScriptGenerator.EnumGenerators.ToList();
+	var interfaceGenerators = TypeScriptGenerator.InterfaceGenerators.ToList();
+	var elementGenerators = TypeScriptGenerator.ElementGenerators.ToList();
+	var automatedElementGenerators = elementGenerators
+		.Where(e => !elementTypesToSkip.Contains(e.Name))
+		.ToList();
+
+	var htmlElementGenerator = elementGenerators.Single(e => e.Name == "HtmlElement");
+	var htmlElementContainerGenerator = elementGenerators.Single(e => e.Name == "HtmlElementContainer");
+
+	var propertyMapGenerators = 
+		(from elementGenerator in elementGenerators
+		 from propertyGenerator in elementGenerator.Properties
+		 group propertyGenerator by propertyGenerator.Name 
+		 into propertyNameGrouping
+		 select new 
+		 { 
+			 Name = propertyNameGrouping.Key,
+			 ElementName = propertyNameGrouping.First().ElementName,
+		 })
+		.Where(g => g.Name != g.ElementName)
+		.ToList();
+
+	var contentMapGenerators = 
+		(from elementGenerator in elementGenerators
+		 from propertyGenerator in elementGenerator.Properties
+		 where propertyGenerator.ContentAttributeName != null
+		 group propertyGenerator by propertyGenerator.ElementName 
+		 into propertyNameGrouping
+		 select new 
+		 { 
+			 Name = propertyNameGrouping.Key,
+			 ContentAttributeName = propertyNameGrouping.First().ContentAttributeName,
+		 })
+		.Where(g => g.Name != g.ContentAttributeName)
+		.ToList();
+
+	Func<string, string> getEventHandlerName = name => 
+    { 
+        return name.Substring(0, name.Length - "Event".Length) + "Handler";
+    };
+#>
+<# /*Initialization:End*/ #>
+<# /*EnumGenerators:Begin*/ #>
+<#
+	foreach(var enumGenerator in enumGenerators)
+    {
+		var enumName = enumGenerator.Name;
+		var enumComment = enumGenerator.Comment;
+#>
+	/**
+	* <#= enumComment #>
+	*/
+	export class <#= enumName #> {
+
+		//#region Static Members
+
+<# 
+		foreach(var property in enumGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyComment = property.Comment;
+#>
+		/**
+		* <#= propertyComment #>
+		*/
+		static <#= propertyName #> = '<#= property.Value #>';
+
+<# 
+        }
+#>
+		//#endregion Static Members
+	}
+
+<# 
+    }
+#>
+<# /*EnumGenerators:End*/ #>
+<# /*InterfaceGenerators:Begin*/ #>
+<# 
+	foreach(var interfaceGenerator in interfaceGenerators)
+    {
+		var interfaceName = interfaceGenerator.Name;
+		var interfaceComment = interfaceGenerator.Comment;
+#>
+
+	//#region <#= interfaceName #>
+
+	/**
+	* <#= interfaceComment #>
+	*/
+	export interface <#= interfaceName #> {
+
+		//#region Properties
+<# 
+		foreach(var property in interfaceGenerator.Properties) 
+        {
+			var propertyName = property.Name;
+			var propertyComment = property.Comment;
+			var propertyType = property.Type;
+#>
+		/**
+		* <#= propertyComment #>
+		*/
+		<#= propertyName #>?: <#= propertyType #>;
+
+<# 
+        }
+#>
+		//#endregion Properties
+	}
+
+	//#endregion <#= interfaceName #>
+<# 
+    }
+#>
+<# /*InterfaceGenerators:End*/ #>
+<# /*HtmlElementConfigProperties:Begin*/ #>
+<# 
+		foreach(var property in htmlElementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyComment = property.Comment;
+			var propertyType = property.Type;
+			var binderName = propertyName + "Binder";
+			var binderComment = propertyComment;
+			var binderPropertyType = "b.IBinder<b.PropertyUpdate<" + propertyType + ">>";
+            if (property.IsInitializable) 
+            {
+#>
+		/*
+		* <#= propertyComment #>
+		*/
+		<#= propertyName #>?: <#= propertyType #>;
+<#          
+            }   
+#>
+
+		/*
+		* <#= binderComment #>
+		*/
+		<#= binderName #>?: <#= binderPropertyType #>;
+
+<# 
+        }
+		foreach(var htmlEvent in htmlElementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+
+#>
+		/**
+		* <#= eventComment #>
+		*/
+		<#= handlerName #>?: (element: Elements.<#= htmlElementGenerator.Name #>, info: <#= handlerType #>) => void;
+
+<# 
+        }
+#>
+<# /*HtmlElementConfigProperties:End*/ #>
+<# /*HtmlElementContainerConfigProperties:Begin*/ #>
+//#region Properties
+
+<# 
+		foreach(var property in htmlElementContainerGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyComment = property.Comment;
+			var propertyType = property.Type;
+			var binderName = propertyName + "Binder";
+			var binderComment = propertyComment;
+			var binderPropertyType = "b.IBinder<b.PropertyUpdate<" + propertyType + ">>";
+            if (property.IsInitializable) 
+            {
+#>
+		/*
+		* <#= propertyComment #>
+		*/
+		<#= propertyName #>?: <#= propertyType #>;
+<# 
+            }
+#>
+
+		/*
+		* <#= binderComment #>
+		*/
+		<#= binderName #>?: <#= binderPropertyType #>;
+
+<# 
+        }
+		foreach(var htmlEvent in htmlElementContainerGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+#>
+		/**
+		* <#= eventComment #>
+		*/
+		<#= handlerName #>?: (element: Elements.<#= htmlElementContainerGenerator.Name #>, info: <#= handlerType #>) => void;
+
+<# 
+        }
+#>
+		//#endregion Properties
+<# /*HtmlElementContainerConfigProperties:End*/ #>
+<# /*ConfigGenerators:Begin*/ #>
+<# 
+	foreach(var elementGenerator in automatedElementGenerators)
+    {
+		var configName = "I" + elementGenerator.Name + "Config";
+		var configBaseType = "I" + elementGenerator.BaseType + "Config";
+		var configComment = elementGenerator.Comment;
+#>
+
+	//#region <#= configName #>
+
+	export interface <#= configName #><# if(elementGenerator.HasBaseType) { #> extends <#= configBaseType #><# } #> {
+
+		//#region Properties
+
+<# 
+		foreach(var property in elementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			var propertyComment = property.Comment;
+			var propertyType = property.Type;
+			var binderName = propertyName + "Binder";
+			var binderComment = propertyComment;
+			var binderPropertyType = "b.IBinder<b.PropertyUpdate<" + propertyType + ">>";
+
+			if(!property.IsElementReference)
+            {
+                if (property.IsInitializable) 
+                {
+#>
+		/*
+		* <#= propertyComment #>
+		*/
+		<#= propertyName #>?: <#= propertyType #>;
+<# 
+                }
+#>
+
+		/*
+		* <#= binderComment #>
+		*/
+		<#= binderName #>?: <#= binderPropertyType #>;
+
+<# 
+            }
+			else
+            {
+#>
+		/*
+		* <#= propertyComment #>
+		*/
+		<#= propertyName #>ID?: string;
+<#
+			}
+        }
+		foreach(var htmlEvent in elementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+#>
+		/**
+		* <#= eventComment #>
+		*/
+		<#= handlerName #>?: (element: Elements.<#= elementGenerator.Name #>, info: <#= handlerType #>) => void;
+
+<# 
+        }
+#>
+		//#endregion Properties
+	}
+
+	//#endregion <#= configName #>
+<# 
+    }
+#>
+<# /*ConfigGenerators:End*/ #>
+<# /*HtmlElementFields:Begin*/ #>
+<#  
+		foreach(var property in htmlElementGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var propertyType = property.Type;
+#>
+		private <#= fieldName #>: b.PropertyUpdate<<#= propertyType #>>;
+<# 
+        }
+		foreach(var htmlEvent in htmlElementGenerator.Events)
+        {
+			var eventName = "_" + htmlEvent.Name;
+			var declaringTypeName = htmlElementGenerator.Name;
+			var eventType = htmlEvent.EventType;
+#>
+		private <#= eventName #>: HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>>;
+<# 
+        }
+#>
+<# /*HtmlElementFields:End*/ #>
+<# /*HtmlElementProperties:Begin*/ #>
+<#  
+		foreach(var property in htmlElementGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var name = property.Name;
+			var elementName = property.ElementName;
+			var propertyName = name + "Property";
+			var propertyType = property.Type;
+			var propertyComment = property.Comment;
+#>
+		//#region <#= propertyName #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= propertyName #>(): b.PropertyUpdate<<#= propertyType #>> {
+			if(!this.<#= fieldName #>)
+				initializeProperty(this, '<#= name #>', '<#= elementName #>');
+			return this.<#= fieldName #>;
+		}
+
+		//#endregion <#= propertyName #>
+
+		//#region <#= name #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= name #>(): <#= propertyType #> {
+			return this.<#= propertyName #>.value;
+		}
+
+		set <#= name #>(value: <#= propertyType #>) {
+			this.<#= propertyName #>.value = value;
+		}
+
+		//#endregion <#= name #>
+
+<# 
+        }
+		foreach(var htmlEvent in htmlElementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+			var declaringTypeName = htmlElementGenerator.Name;
+#>
+		//#region <#= eventPropertyName #>
+
+		/**
+		* <#= eventComment #>
+		*/
+		get <#= eventPropertyName #>(): HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>> {
+			if(!this.<#= eventFieldName #>)
+				this.<#= eventFieldName #> = new HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= handlerType #>>('<#= htmlEvent.ElementName #>', '<#= eventType #>', this);
+
+			return this.<#= eventFieldName #>;
+		}
+
+		//#endregion <#= eventPropertyName #>
+
+<# 
+        }
+#>
+<# /*HtmlElementProperties:End*/ #>
+<# /*HtmlElementSetConfigProperties:Begin*/ #>
+<#  
+		foreach(var property in htmlElementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+#>
+            setPropertyFromConfig(this, config, '<#= propertyName #>', <#= property.IsInitializable.ToString().ToLower() #>);
+<#  
+        }
+#>
+
+<#
+		foreach(var htmlEvent in htmlElementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+#>
+			if(config.<#= handlerName #>)
+				this.<#= eventPropertyName #>.subscribe(config.<#= handlerName #>);
+
+<# 
+        }
+#>
+<# /*HtmlElementSetConfigProperties:End*/ #>
+<# /*HtmlElementContainerFields:Begin*/ #>
+<#  
+		foreach(var property in htmlElementContainerGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var propertyType = property.Type;
+#>
+		private <#= fieldName #>: b.PropertyUpdate<<#= propertyType #>>;
+<# 
+        }
+		foreach(var htmlEvent in htmlElementContainerGenerator.Events)
+        {
+			var eventName = "_" + htmlEvent.Name;
+			var declaringTypeName = htmlElementContainerGenerator.Name;
+			var eventType = htmlEvent.EventType;
+#>
+		private <#= eventName #>: HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>>;
+<# 
+        }
+#>
+<# /*HtmlElementContainerFields:End*/ #>
+<# /*HtmlElementContainerProperties:Begin*/ #>
+<#  
+		foreach(var property in htmlElementContainerGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var name = property.Name;
+			var elementName = property.ElementName;
+			var propertyName = name + "Property";
+			var propertyType = property.Type;
+			var propertyComment = property.Comment;
+#>
+		//#region <#= propertyName #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= propertyName #>(): b.PropertyUpdate<<#= propertyType #>> {
+			if(!this.<#= fieldName #>)
+				initializeProperty(this, '<#= name #>', '<#= elementName #>');
+			return this.<#= fieldName #>;
+		}
+
+		//#endregion <#= propertyName #>
+
+		//#region <#= name #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= name #>(): <#= propertyType #> {
+			return this.<#= propertyName #>.value;
+		}
+
+		set <#= name #>(value: <#= propertyType #>) {
+			this.<#= propertyName #>.value = value;
+		}
+
+		//#endregion <#= name #>
+
+<# 
+        }
+		foreach(var htmlEvent in htmlElementContainerGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+			var declaringTypeName = htmlElementContainerGenerator.Name;
+#>
+		//#region <#= eventPropertyName #>
+
+		/**
+		* <#= eventComment #>
+		*/
+		get <#= eventPropertyName #>(): HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>> {
+			if(!this.<#= eventFieldName #>)
+				this.<#= eventFieldName #> = new HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>>('<#= htmlEvent.ElementName #>', '<#= eventType #>', this);
+
+			return this.<#= eventFieldName #>;
+		}
+
+		//#endregion <#= eventPropertyName #>
+
+<# 
+        }
+#>
+<# /*HtmlElementContainerProperties:End*/ #>
+<# /*HtmlElementContainerSetConfigProperties:Begin*/ #>
+<#  
+		foreach(var property in htmlElementContainerGenerator.Properties)
+        {
+			var propertyName = property.Name;
+#>
+            setPropertyFromConfig(this, config, '<#= propertyName #>', <#= property.IsInitializable.ToString().ToLower() #>);
+<#  
+        }
+#>
+
+<#
+		foreach(var htmlEvent in htmlElementContainerGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+#>
+			if(config.<#= handlerName #>)
+				this.<#= eventPropertyName #>.subscribe(config.<#= handlerName #>);
+
+<# 
+        }
+#>
+<# /*HtmlElementContainerSetConfigProperties:End*/ #>
+<# /*ElementGenerators:Begin*/ #>
+<# 
+	foreach(var elementGenerator in automatedElementGenerators)
+    {
+		var elementName = elementGenerator.Name;
+		var elementComment = elementGenerator.Comment;
+		var baseType = elementGenerator.BaseType;
+		var configName = "I" + elementName + "Config";
+#>
+	//#region <#= elementName #>
+
+	/**
+	* <#= elementComment #>
+	*/
+	export class <#= elementName #> extends <#= baseType #> {
+
+		//#region Fields
+
+<#  
+		foreach(var property in elementGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var propertyType = property.Type;
+
+			if(!property.IsElementReference)
+            {
+#>
+		private <#= fieldName #>: b.PropertyUpdate<<#= propertyType #>>;
+<# 
+			}
+			else
+            {
+#>
+		private <#= fieldName #>ID: string;
+		private <#= fieldName #>: <#= propertyType #>;
+<#
+            }
+        }
+		foreach(var htmlEvent in elementGenerator.Events)
+        {
+			var eventName = "_" + htmlEvent.Name;
+			var declaringTypeName = elementGenerator.Name;
+			var eventType = htmlEvent.EventType;
+#>
+		private <#= eventName #>: HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>>;
+<# 
+        }
+#>
+
+		//#endregion Fields
+
+		//#region Properties
+
+<#  
+		foreach(var property in elementGenerator.Properties)
+        {
+			var fieldName = "_" + property.Name + "Property";
+			var name = property.Name;
+			var autoGeneratedElementName = property.ElementName;
+			var propertyName = name + "Property";
+			var propertyType = property.Type;
+			var propertyComment = property.Comment;
+
+			if(!property.IsElementReference)
+            {
+#>
+		//#region <#= propertyName #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= propertyName #>(): b.PropertyUpdate<<#= propertyType #>> {
+			if(!this.<#= fieldName #>)
+				initializeProperty(this, '<#= name #>', '<#= autoGeneratedElementName #>');
+			return this.<#= fieldName #>;
+		}
+
+		//#endregion <#= propertyName #>
+
+		//#region <#= name #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= name #>(): <#= propertyType #> {
+			return this.<#= propertyName #>.value;
+		}
+
+		set <#= name #>(value: <#= propertyType #>) {
+			this.<#= propertyName #>.value = value;
+		}
+
+		//#endregion <#= name #>
+
+<# 
+			}
+			else
+            {
+#>
+		//#region <#= name #>
+
+		/**
+		* <#= propertyComment #>
+		*/
+		get <#= name #>(): <#= propertyType #> {
+			return getElementPropertyValue<<#= propertyType #>>(this, '<#= name #>');
+		}
+
+		set <#= name #>(value: <#= propertyType #>) {
+			setElementPropertyValue(this, '<#= name #>', value);
+		}
+
+		//#endregion <#= name #>
+
+<#
+            }
+        }
+		foreach(var htmlEvent in elementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+			var declaringTypeName = elementGenerator.Name;
+#>
+		//#region <#= eventPropertyName #>
+
+		/**
+		* <#= eventComment #>
+		*/
+		get <#= eventPropertyName #>(): HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>> {
+			if(!this.<#= eventFieldName #>)
+				this.<#= eventFieldName #> = new HtmlElementEvent<Elements.<#= declaringTypeName #>, <#= eventType #>>('<#= htmlEvent.ElementName #>', '<#= eventType #>', this);
+
+			return this.<#= eventFieldName #>;
+		}
+
+		//#endregion <#= eventPropertyName #>
+
+<# 
+        }
+#>
+		//#endregion Properties
+        
+        //#region Constructor
+
+        /** 
+        * Initializes a new <#= elementGenerator.Name #>'.
+        */
+        constructor(config: I<#= elementGenerator.Name #>Config) {
+			super('<#= elementGenerator.ElementName #>', config)
+        }
+
+        //#endregion Constructor
+
+        //#region Base Class Overrides
+
+        /** 
+        * Protected
+        * Configures the DOM node with data from the config.
+        * @param [element] The DOM node to configure.
+        * @param [document] The document used to create elements.
+        */
+        configure(element: Node, document: Document): void {
+            super.configure(element, document);
+            var config = this.getConfig<<#= configName #>>();
+<#  
+		foreach(var property in elementGenerator.Properties)
+        {
+			var propertyName = property.Name;
+			if(!property.IsElementReference)
+            {
+#>
+            setPropertyFromConfig(this, config, '<#= propertyName #>', <#= property.IsInitializable.ToString().ToLower() #>);
+<#
+			}
+			else
+			{
+#>
+			setElementPropertyFromConfig(this, config, '<#= propertyName #>');
+<#
+            }
+        }
+#>
+
+<#
+		foreach(var htmlEvent in elementGenerator.Events)
+        {
+			var eventPropertyName = htmlEvent.Name;
+			var eventFieldName = "_" + eventPropertyName;
+			var eventType = htmlEvent.EventType;
+			var handlerType = htmlEvent.HandlerType;
+			var eventComment = htmlEvent.Comment;
+			var handlerName = getEventHandlerName(eventPropertyName);
+#>
+			if(config.<#= handlerName #>)
+				this.<#= eventPropertyName #>.subscribe(config.<#= handlerName #>);
+
+<# 
+        }
+#>
+        }
+
+        //#endregion Base Class Overrides
+	}
+
+	//#endregion <#= elementName #>
+
+<# 
+    }
+#>
+<# /*ElementGenerators:End*/ #>
+<# /*PropertyMapGeneration:Begin*/ #>
+<# 
+	for(int i = 0, length = propertyMapGenerators.Count; i < length; i++)
+    { 
+		var propertyMapGenerator = propertyMapGenerators[i];
+		var isLastElement = i == length - 1;
+		var name = propertyMapGenerator.Name;
+		var elementName = propertyMapGenerator.ElementName;
+#>
+			.add('<#= elementName #>', '<#= name #>')<# if(isLastElement) { #>;<# } #>
+
+<# 
+    }
+#>
+<# /*PropertyMapGeneration:End*/ #>
+<# /*ContentMapGeneration:Begin*/ #>
+<# 
+	for(int i = 0, length = contentMapGenerators.Count; i < length; i++)
+    { 
+		var contentMapGenerator = contentMapGenerators[i];
+		var isLastElement = i == length - 1;
+		var elementName = contentMapGenerator.Name;
+		var contentAttributeName = contentMapGenerator.ContentAttributeName;
+#>
+			.add('<#= contentAttributeName #>', '<#= elementName #>')<# if(isLastElement) { #>;<# } #>
+
+<# 
+    }
+#>
+<# /*ContentMapGeneration:End*/ #>
+<# /*ConstructorMapGeneration:Begin*/ #>
+<# 
+	for(int i = 0, length = automatedElementGenerators.Count; i < length; i++)
+    { 
+		var elementGenerator = automatedElementGenerators[i];
+		var isLastElement = i == length - 1;
+		var elementType = elementGenerator.ElementName.ToUpper();
+		var name = elementGenerator.Name;
+#>
+			.add('<#= elementType #>', <#= name #>)<# if(isLastElement) { #>;<# } #>
+
+<# 
+    }
+#>
+<# /*ConstructorMapGeneration:End*/ #>
+<# /*ElementFactoryGenerators:Begin*/ #>
+<# 
+	foreach(var elementGenerator in automatedElementGenerators)
+    {
+		var elementName = elementGenerator.Name;
+		var configName = "I" + elementName + "Config";
+		var factoryMethodName = elementGenerator.FactoryMethodName;
+        var elementComment = elementGenerator.Comment;
+#>
+	//#region <#= factoryMethodName #>
+
+	/**
+	* <#= elementComment #>
+	* @param [config] The configuration for the <#= elementName #>.
+	* @returns a new <#= elementName #>.
+	*/
+	export function <#= factoryMethodName #>(config?: <#= configName #>): Elements.<#= elementName #> {
+        return new Elements.<#= elementName #>(config);
+    }
+
+	//#endregion <#= factoryMethodName #>
+
+<# 
+    }
+#>
+<# /*ElementFactoryGenerators:End*/ #>
+

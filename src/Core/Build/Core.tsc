@@ -1,0 +1,15 @@
+﻿--out C:\Classical\bin\classical.js
+--target ES5
+--removeComments
+..\Hash.ts 
+..\Native.ts 
+..\Utilities.ts 
+..\Assert.ts
+..\Core.ts
+..\Reflection.ts
+..\Collections.ts
+..\Expression.ts
+..\Events.ts 
+..\Binding.ts
+..\Binding.Collections.ts
+..\Aspects.ts

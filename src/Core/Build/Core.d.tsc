@@ -1,0 +1,15 @@
+﻿--out C:\Classical\bin\classical.d.ts
+--target ES5
+--declaration
+..\Hash.ts 
+..\Native.ts 
+..\Utilities.ts 
+..\Assert.ts
+..\Core.ts
+..\Reflection.ts
+..\Collections.ts
+..\Expression.ts
+..\Events.ts 
+..\Binding.ts
+..\Binding.Collections.ts
+..\Aspects.ts
